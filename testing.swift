@@ -1,8 +1,6 @@
-// EchoNav – Minimal LiDAR proximity alert
+// EchoNav – Minimal LiDAR proximity alert (FIXED)
 // SwiftUI + RealityKit + ARKit + AVAudioEngine
-// Drop this into a new SwiftUI iOS app target. Add the Info.plist key:
-//   Privacy - Camera Usage Description (NSCameraUsageDescription)
-// Requires a LiDAR-capable device (e.g., iPhone 12 Pro or later).
+// NOTE: Add to Info.plist -> NSCameraUsageDescription
 
 import SwiftUI
 import RealityKit
@@ -41,15 +39,15 @@ final class ProximityViewModel: NSObject, ObservableObject {
     @Published var isLiDARAvailable: Bool = false
     @Published var warningLevel: WarningLevel = .none
 
-    // Tuning
-    private let nearThreshold: Float = 0.6     // meters – continuous tone below this
-    private let midThreshold: Float  = 1.2     // meters – faster beeps below this
-    private let maxSense: Float      = 3.0     // meters – ignore detections beyond this
+    // Tuning (made file-visible so Coordinator can read them)
+    let nearThreshold: Float = 0.6     // meters – continuous tone below this
+    let midThreshold: Float  = 1.2     // meters – faster beeps below this
+    let maxSense: Float      = 3.0     // meters – ignore detections beyond this
 
     fileprivate weak var arView: ARView?
-    private var audio: ProximityAudio = ProximityAudio()
-    private var haptics = UINotificationFeedbackGenerator()
-    private var lastCrossedNear = false
+    fileprivate var audio: ProximityAudio = ProximityAudio()
+    fileprivate var haptics = UINotificationFeedbackGenerator()
+    fileprivate var lastCrossedNear = false
 
     func start() {
         guard ARWorldTrackingConfiguration.supportsSceneReconstruction(.mesh) else {
@@ -78,14 +76,14 @@ struct ARViewContainer: UIViewRepresentable {
         viewModel.arView = view
         view.session.delegate = context.coordinator
 
-        // Configuration LiDAR
+        // LiDAR configuration
         let config = ARWorldTrackingConfiguration()
         config.sceneReconstruction = .meshWithClassification
         if ARWorldTrackingConfiguration.supportsFrameSemantics(.sceneDepth) {
             config.frameSemantics.insert(.sceneDepth)
         }
         config.environmentTexturing = .automatic
-        view.debugOptions = [] // [.showSceneUnderstanding] // uncomment for mesh debugging
+        view.debugOptions = [] // [.showSceneUnderstanding]
         view.session.run(config, options: [.resetTracking, .removeExistingAnchors])
 
         return view
@@ -100,9 +98,7 @@ struct ARViewContainer: UIViewRepresentable {
         private var lastSampleTime: CFTimeInterval = 0
         private let sampleHz: Double = 10 // compute distance at ~10 Hz to save power
 
-        init(viewModel: ProximityViewModel) {
-            self.vm = viewModel
-        }
+        init(viewModel: ProximityViewModel) { self.vm = viewModel }
 
         func session(_ session: ARSession, didUpdate frame: ARFrame) {
             let now = frame.timestamp
@@ -110,31 +106,14 @@ struct ARViewContainer: UIViewRepresentable {
             lastSampleTime = now
             guard let arView = vm.arView else { return }
 
-            // Forward ray from camera center
-            let cameraTransform = frame.camera.transform
-            let origin = SIMD3<Float>(cameraTransform.columns.3.x,
-                                      cameraTransform.columns.3.y,
-                                      cameraTransform.columns.3.z)
-            // Camera looks along -Z in its local space
-            let forward = -SIMD3<Float>(cameraTransform.columns.2.x,
-                                        cameraTransform.columns.2.y,
-                                        cameraTransform.columns.2.z)
-
-            if let query = arView.makeRaycastQuery(from: arView.center,
-                                                   allowing: .estimatedPlane,
-                                                   alignment: .any),
-               let result = arView.session.raycast(query).first {
-                let d = result.distance
-                handleDistance(d)
+            // Cast a ray from the screen center using RealityKit helper.
+            let center = CGPoint(x: arView.bounds.midX, y: arView.bounds.midY)
+            let results = arView.raycast(from: center, allowing: .estimatedPlane, alignment: .any)
+            if let result = results.first {
+                // ARRaycastResult.distance is in meters (Float)
+                handleDistance(result.distance)
             } else {
-                // Fallback: project manual ray 0.5m..maxSense in front of camera and cast
-                let maxSense: Float = vm.maxSense
-                let end = origin + forward * maxSense
-                if let r = arView.raycast(from: origin, to: end).first {
-                    handleDistance(r.distance)
-                } else {
-                    handleNoHit()
-                }
+                handleNoHit()
             }
         }
 
