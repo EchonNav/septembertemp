@@ -9,8 +9,8 @@ import AVFoundation
 import Combine
 
 @main
-struct EchoNavApp: App {
-    var body: some Scene {
+struct EchoNavApp: SwiftUI.App {
+    var body: some SwiftUI.Scene {
         WindowGroup { ContentView() }
     }
 }
@@ -146,7 +146,11 @@ struct ARViewContainer: UIViewRepresentable {
                 let pt = CGPoint(x: w * (0.5 + o), y: y)
                 let results = arView.raycast(from: pt, allowing: .estimatedPlane, alignment: .any)
                 if let r = results.first { // distance in meters
-                    let d = r.distance
+                    let worldTransform = r.worldTransform
+                    let worldPosition = simd_float3(worldTransform.columns.3.x, worldTransform.columns.3.y, worldTransform.columns.3.z)
+                    let cameraTransform = arView.cameraTransform.matrix
+                    let cameraPosition = simd_float3(cameraTransform.columns.3.x, cameraTransform.columns.3.y, cameraTransform.columns.3.z)
+                    let d = Float(simd_length(worldPosition - cameraPosition))
                     if d <= vm.maxSense {
                         hits.append(d)
                         if d < closest { closest = d }
