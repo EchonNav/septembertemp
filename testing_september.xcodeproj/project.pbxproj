@@ -29,22 +29,9 @@
 		619253132E785331009D18A5 /* testing_septemberUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = testing_septemberUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
-/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
-		619253332E787E67009D18A5 /* Exceptions for "testing_september" folder in "testing_september" target */ = {
-			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
-			membershipExceptions = (
-				"testing-september-Info.plist",
-			);
-			target = 619252FB2E785330009D18A5 /* testing_september */;
-		};
-/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
-
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		619252FE2E785330009D18A5 /* testing_september */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-				619253332E787E67009D18A5 /* Exceptions for "testing_september" folder in "testing_september" target */,
-			);
 			path = testing_september;
 			sourceTree = "<group>";
 		};

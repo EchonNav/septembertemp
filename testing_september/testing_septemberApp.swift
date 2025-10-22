@@ -116,7 +116,7 @@ struct ARViewContainer: UIViewRepresentable {
         private var lastSampleTime: CFTimeInterval = 0
         private let sampleHz: Double = 10 // keep proximity at ~10 Hz
         private var lastAnalysisTime: CFTimeInterval = 0
-        private let analysisHz: Double = 3 // heavier analysis less often
+        private let analysisHz: Double = 1 // heavier analysis less often
 
         init(viewModel: ProximityViewModel) { self.vm = viewModel }
 
