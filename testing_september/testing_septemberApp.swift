@@ -49,11 +49,12 @@ final class ProximityViewModel: NSObject, ObservableObject {
     @Published var isLiDARAvailable: Bool = false
     @Published var warningLevel: WarningLevel = .none
     @Published var lastDescription: String = "—"
+    @Published var isAudioEnabled: Bool = true
 
     // Tuning
-    let nearThreshold: Float = 0.6
-    let midThreshold: Float  = 1.2
-    let maxSense: Float      = 3.0
+    let nearThreshold: Float = 0.5
+    let midThreshold: Float  = 1.0
+    let maxSense: Float      = 4.0
 
     fileprivate weak var arView: ARView?
     fileprivate var audio: ProximityAudio = ProximityAudio()
@@ -67,7 +68,7 @@ final class ProximityViewModel: NSObject, ObservableObject {
 
     // Rate limiting for narration
     fileprivate var lastNarrationTime: CFTimeInterval = 0
-    fileprivate let narrationCooldown: CFTimeInterval = 2.0 // seconds
+    fileprivate let narrationCooldown: CFTimeInterval = 1.0 // seconds
 
     func start() {
         guard ARWorldTrackingConfiguration.supportsSceneReconstruction(.mesh) else {
@@ -114,9 +115,9 @@ struct ARViewContainer: UIViewRepresentable {
     final class Coordinator: NSObject, ARSessionDelegate {
         private let vm: ProximityViewModel
         private var lastSampleTime: CFTimeInterval = 0
-        private let sampleHz: Double = 10 // keep proximity at ~10 Hz
+        private let sampleHz: Double = 20 // keep proximity at ~20 Hz
         private var lastAnalysisTime: CFTimeInterval = 0
-        private let analysisHz: Double = 1 // heavier analysis less often
+        private let analysisHz: Double = 2   // heavier analysis less often
 
         init(viewModel: ProximityViewModel) { self.vm = viewModel }
 
@@ -172,17 +173,29 @@ struct ARViewContainer: UIViewRepresentable {
             if d < vm.nearThreshold {
                 vm.statusText = "DANGER: obstacle très proche"
                 vm.warningLevel = .high
-                vm.audio.setMode(.continuous(frequency: mapFreq(for: d)))
+                if vm.isAudioEnabled {
+                    vm.audio.setMode(.continuous(frequency: mapFreq(for: d)))
+                } else {
+                    vm.audio.setMode(.silent)
+                }
                 if !vm.lastCrossedNear { vm.haptics.notificationOccurred(.warning); vm.lastCrossedNear = true }
             } else if d < vm.midThreshold {
                 vm.statusText = "Attention: obstacle proche"
                 vm.warningLevel = .medium
-                vm.audio.setMode(.beep(interval: mapInterval(for: d), frequency: mapFreq(for: d)))
+                if vm.isAudioEnabled {
+                    vm.audio.setMode(.beep(interval: mapInterval(for: d), frequency: mapFreq(for: d)))
+                } else {
+                    vm.audio.setMode(.silent)
+                }
                 if vm.lastCrossedNear { vm.lastCrossedNear = false }
             } else if d <= vm.maxSense {
                 vm.statusText = "Zone dégagée"
                 vm.warningLevel = .low
-                vm.audio.setMode(.beep(interval: 1.0, frequency: 600))
+                if vm.isAudioEnabled {
+                    vm.audio.setMode(.beep(interval: 1.0, frequency: 600))
+                } else {
+                    vm.audio.setMode(.silent)
+                }
                 vm.lastCrossedNear = false
             } else { handleNoHit() }
         }
@@ -235,15 +248,36 @@ struct HUD: View {
             .padding(10)
             .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
 
-            // Live textual description from analyzer
-            HStack(alignment: .top, spacing: 8) {
-                Image(systemName: "speaker.wave.2.fill")
-                Text(viewModel.lastDescription)
-                    .font(.subheadline)
-                    .fixedSize(horizontal: false, vertical: true)
+            // Audio toggle button
+            HStack(spacing: 12) {
+                Button(action: {
+                    viewModel.isAudioEnabled.toggle()
+                    if !viewModel.isAudioEnabled {
+                        viewModel.audio.setMode(.silent)
+                    }
+                }) {
+                    HStack(spacing: 6) {
+                        Image(systemName: viewModel.isAudioEnabled ? "speaker.wave.2.fill" : "speaker.slash.fill")
+                            .foregroundColor(viewModel.isAudioEnabled ? .green : .red)
+                        Text(viewModel.isAudioEnabled ? "Son ON" : "Son OFF")
+                            .font(.subheadline.weight(.medium))
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                }
+                .buttonStyle(PlainButtonStyle())
+                
+                // Live textual description from analyzer
+                HStack(alignment: .top, spacing: 8) {
+                    Image(systemName: "text.bubble.fill")
+                    Text(viewModel.lastDescription)
+                        .font(.subheadline)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .padding(10)
+                .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
             }
-            .padding(10)
-            .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
         }
         .foregroundStyle(.primary)
     }
